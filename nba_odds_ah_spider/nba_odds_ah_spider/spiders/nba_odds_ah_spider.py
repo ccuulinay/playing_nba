@@ -14,11 +14,13 @@ class NbaOddsAHSpider(Spider):
     allowed_domains = ["oddsportal.com"]
 
     start_urls = []
-    start_url ="http://www.oddsportal.com/basketball/usa/nba-2015-2016/results/#/page/"
-    #start_url ="http://www.oddsportal.com/basketball/usa/results/#/page/"
-    number_pages = 30
-    #number_pages = 13
+    # start_url ="http://www.oddsportal.com/basketball/usa/nba-2015-2016/results/#/page/"
 
+    start_url ="http://www.oddsportal.com/basketball/usa/nba/results/#/page/"
+    # number_pages = 30
+    number_pages = 19
+
+    # start_urls.append(start_url)
     for x in range(1, number_pages):
         start_urls.append(start_url + str(x))
 

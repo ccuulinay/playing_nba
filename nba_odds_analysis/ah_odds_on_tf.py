@@ -182,18 +182,18 @@ COLUMNS = ['away_team__Atlanta_Hawks',
            'odd_cnt_1',
            'new_odd_home_1',
            'new_odd_away_1',
-           'ah_2',
-           'odd_cnt_2',
-           'new_odd_home_2',
-           'new_odd_away_2',
-           'ah_3',
-           'odd_cnt_3',
-           'new_odd_home_3',
-           'new_odd_away_3',
-           'ah_4',
-           'odd_cnt_4',
-           'new_odd_home_4',
-           'new_odd_away_4',
+           # 'ah_2',
+           # 'odd_cnt_2',
+           # 'new_odd_home_2',
+           # 'new_odd_away_2',
+           # 'ah_3',
+           # 'odd_cnt_3',
+           # 'new_odd_home_3',
+           # 'new_odd_away_3',
+           # 'ah_4',
+           # 'odd_cnt_4',
+           # 'new_odd_home_4',
+           # 'new_odd_away_4',
            'year',
            'month',
            'day',
@@ -205,87 +205,7 @@ COLUMNS = ['away_team__Atlanta_Hawks',
            'total_score',
            'sub_score']
 
-FEATURES = ['away_team__Atlanta_Hawks',
-            'away_team__Boston_Celtics',
-            'away_team__Brooklyn_Nets',
-            'away_team__Charlotte_Hornets',
-            'away_team__Chicago_Bulls',
-            'away_team__Cleveland_Cavaliers',
-            'away_team__Dallas_Mavericks',
-            'away_team__Denver_Nuggets',
-            'away_team__Detroit_Pistons',
-            'away_team__Golden_State_Warriors',
-            'away_team__Houston_Rockets',
-            'away_team__Indiana_Pacers',
-            'away_team__Los_Angeles_Clippers',
-            'away_team__Los_Angeles_Lakers',
-            'away_team__Memphis_Grizzlies',
-            'away_team__Miami_Heat',
-            'away_team__Milwaukee_Bucks',
-            'away_team__Minnesota_Timberwolves',
-            'away_team__New_Orleans_Pelicans',
-            'away_team__New_York_Knicks',
-            'away_team__Oklahoma_City_Thunder',
-            'away_team__Orlando_Magic',
-            'away_team__Philadelphia_76ers',
-            'away_team__Phoenix_Suns',
-            'away_team__Portland_Trail_Blazers',
-            'away_team__Sacramento_Kings',
-            'away_team__San_Antonio_Spurs',
-            'away_team__Toronto_Raptors',
-            'away_team__Utah_Jazz',
-            'away_team__Washington_Wizards',
-            'home_team__Atlanta_Hawks',
-            'home_team__Boston_Celtics',
-            'home_team__Brooklyn_Nets',
-            'home_team__Charlotte_Hornets',
-            'home_team__Chicago_Bulls',
-            'home_team__Cleveland_Cavaliers',
-            'home_team__Dallas_Mavericks',
-            'home_team__Denver_Nuggets',
-            'home_team__Detroit_Pistons',
-            'home_team__Golden_State_Warriors',
-            'home_team__Houston_Rockets',
-            'home_team__Indiana_Pacers',
-            'home_team__Los_Angeles_Clippers',
-            'home_team__Los_Angeles_Lakers',
-            'home_team__Memphis_Grizzlies',
-            'home_team__Miami_Heat',
-            'home_team__Milwaukee_Bucks',
-            'home_team__Minnesota_Timberwolves',
-            'home_team__New_Orleans_Pelicans',
-            'home_team__New_York_Knicks',
-            'home_team__Oklahoma_City_Thunder',
-            'home_team__Orlando_Magic',
-            'home_team__Philadelphia_76ers',
-            'home_team__Phoenix_Suns',
-            'home_team__Portland_Trail_Blazers',
-            'home_team__Sacramento_Kings',
-            'home_team__San_Antonio_Spurs',
-            'home_team__Toronto_Raptors',
-            'home_team__Utah_Jazz',
-            'home_team__Washington_Wizards',
-            'ah_1',
-            'odd_cnt_1',
-            'new_odd_home_1',
-            'new_odd_away_1',
-            'ah_2',
-            'odd_cnt_2',
-            'new_odd_home_2',
-            'new_odd_away_2',
-            'ah_3',
-            'odd_cnt_3',
-            'new_odd_home_3',
-            'new_odd_away_3',
-            'ah_4',
-            'odd_cnt_4',
-            'new_odd_home_4',
-            'new_odd_away_4',
-            'year',
-            'month',
-            'day',
-            'weekDay',
-            'ot']
+FEATURES = COLUMNS[:-5]
 
 LABEL_1 = ['home_win']
 LABEL_2 = ['sub_score']
@@ -309,7 +229,7 @@ def input_fn(data_df, label_df):
     return f_cols, label
 
 
-def main(unused_argv):
+def read_n_preprocess_ah_df():
     ah_df = read_mongo_data_to_dataframe()
     ah_df = ah_df[ah_df.away_team != 'Team USA']
     ah_df = ah_df[ah_df.away_team != 'West']
@@ -345,6 +265,11 @@ def main(unused_argv):
     ah_df['sub_score'] = ah_df['score_home'] - ah_df['score_away']
 
     ah_df.rename(columns=lambda x: x.replace(' ', '_'), inplace=True)
+    return ah_df
+
+
+def main(unused_argv):
+    ah_df = read_n_preprocess_ah_df()
 
     ah_df = ah_df[COLUMNS]
 
@@ -360,7 +285,7 @@ def main(unused_argv):
     feature_cols = [tf.contrib.layers.real_valued_column(k) for k in FEATURES]
 
     regressor = tf.contrib.learn.DNNRegressor(feature_columns=feature_cols, model_dir=dnn_model_dir,
-                                              hidden_units=[128, 64, 10])
+                                              hidden_units=[256, 64, 8])
 
     regressor.fit(input_fn=lambda: input_fn(x_train, y_train), steps=5000)
 
@@ -382,10 +307,11 @@ def main(unused_argv):
     payout_df['home_win'] = home_win
     payout_df['sub_score'] = sub_score
     payout_df['payout_1'] = payout_df.apply(lambda x : calculate_payout(x), axis=1)
-    payout_df['payout_2'] = payout_df.apply(lambda x : calculate_payout(x, num=2), axis=1)
-    payout_df['payout_3'] = payout_df.apply(lambda x : calculate_payout(x, num=3), axis=1)
-    payout_df['payout_4'] = payout_df.apply(lambda x : calculate_payout(x, num=4), axis=1)
-    print(payout_df.payout_1.sum(), payout_df.payout_2.sum(),payout_df.payout_3.sum(),payout_df.payout_4.sum())
+    # payout_df['payout_2'] = payout_df.apply(lambda x : calculate_payout(x, num=2), axis=1)
+    # payout_df['payout_3'] = payout_df.apply(lambda x : calculate_payout(x, num=3), axis=1)
+    # payout_df['payout_4'] = payout_df.apply(lambda x : calculate_payout(x, num=4), axis=1)
+    # print(payout_df.payout_1.sum(), payout_df.payout_2.sum(),payout_df.payout_3.sum(),payout_df.payout_4.sum())
+    print(payout_df.payout_1.sum())
 
 
 if __name__ == "__main__":
