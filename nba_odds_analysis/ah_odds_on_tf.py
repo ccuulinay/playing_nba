@@ -1,122 +1,20 @@
-from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import pandas as pd
-from pymongo import MongoClient
 import numpy as np
 import itertools
-from decimal import Decimal
 
 from sklearn.model_selection import train_test_split
 
 import tensorflow as tf
+import odds_data_getter as odg
 
 MONGODB_SERVER = "localhost"
 MONGODB_PORT = 27017
 
 MONGODB_DB = "nba_odds_n_predict"
 MONGODB_COLLECTION = "games_ah_odds"
-
-# Fix non-browser request issue
-HEADERS = {
-    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36'}
-
-
-def _connect_to_mongo(host, port, username, password, db):
-    """ A util for making a connection to mongo """
-
-    if username and password:
-        mongo_uri = 'mongodb://%s:%s@%s:%s/%s' % (username, password, host, port, db)
-        conn = MongoClient(mongo_uri)
-    else:
-        conn = MongoClient(host, port)
-
-    return conn[db]
-
-
-def read_mongo_data_to_dataframe(db=MONGODB_DB, collection=MONGODB_COLLECTION, query={}, host=MONGODB_SERVER,
-                                 port=MONGODB_PORT, username=None, password=None, no_id=True):
-    """ Read from Mongo and Store into DataFrame """
-
-    # Connect to MongoDB
-    db = _connect_to_mongo(host=host, port=port, username=username, password=password, db=db)
-
-    # Make a query to the specific DB and Collection
-    cursor = db[collection].find(query)
-
-    # Expand the cursor and construct the DataFrame
-    df = pd.DataFrame(list(cursor))
-
-    # Delete the _id
-    if no_id:
-        del df['_id']
-
-    return df
-
-
-def fraction2decimal(f):
-    if f.find("/") != -1:
-        return float(Decimal(f.split('/')[0]) / Decimal(f.split('/')[1])) + 1
-    else:
-        return f
-
-
-def american2decimal(a):
-    if a.find("+") != -1:
-        return (float(a) / 100) + 1
-    elif a.find("-") != -1:
-        return (100 / abs(float(a))) + 1
-    else:
-        return a
-
-
-def to_decimal(x):
-    if x.find(".") != -1:
-        return x
-    elif x.find("/") != -1:
-        return fraction2decimal(x)
-    else:
-        return american2decimal(x)
-
-
-def get_total_odds_count(row):
-    total_cnt = 0
-    for i in range(1, 5):
-        total_cnt += float(row['odd_cnt_' + str(i)])
-    return total_cnt
-
-
-def normalize_odds_count(row, num):
-    total_cnt = get_total_odds_count(row)
-    return (float(row['odd_cnt_' + str(num)])) / total_cnt
-
-
-def normalize_odd(row, num):
-    total = (float(row['new_odd_home_' + str(num)])) + (float(row['new_odd_away_' + str(num)]))
-    norm_home = (float(row['new_odd_home_' + str(num)])) / total
-    norm_away = (float(row['new_odd_home_' + str(num)])) / total
-    return norm_home, norm_away
-
-
-def normalize_ah_odds(row):
-    for i in range(1, 5):
-        norm_cnt = normalize_odds_count(row, i)
-        ah = row['ah_' + str(i)]
-        norm_home, norm_away = normalize_odd(row, i)
-        row['norm_home_odds_' + str(i)] = ah * norm_cnt * norm_home
-        row['norm_away_odds_' + str(i)] = ah * norm_cnt * norm_away
-
-
-def calculate_payout(row, num=1):
-    if float(row['sub_score']) >= (-1) * float(row['ah_' + str(num)]):
-        home_win_with_ah = 1.0
-    else:
-        home_win_with_ah = 0.0
-    if float(row['predict_subscore']) >= (-1) * float(row['ah_' + str(num)]):
-        return (float(row['new_odd_home_' + str(num)]) * home_win_with_ah) - 1.0
-    else:
-        return (float(row['new_odd_away_' + str(num)]) * (1.0 - home_win_with_ah)) - 1.0
 
 COLUMNS = ['away_team__Atlanta_Hawks',
            'away_team__Boston_Celtics',
@@ -229,12 +127,20 @@ def input_fn(data_df, label_df):
     return f_cols, label
 
 
-def read_n_preprocess_ah_df():
-    ah_df = read_mongo_data_to_dataframe()
+def read_n_preprocess_ah_df(teams_df):
+    ah_df = odg.read_mongo_data_to_dataframe()
     ah_df = ah_df[ah_df.away_team != 'Team USA']
     ah_df = ah_df[ah_df.away_team != 'West']
     ah_df = ah_df[ah_df.home_team != 'Team World']
     ah_df = ah_df[ah_df.away_team != 'EAST']
+
+    ah_df = ah_df.merge(teams_df, how='left', left_on='away_team', right_on='FULL_TEAM_NAME')
+    ah_df.drop(['FULL_TEAM_NAME'],axis=1, inplace=True)
+    ah_df.rename(columns={'TEAM_ID': 'away_team_id'}, inplace=True)
+    ah_df = ah_df.merge(teams_df, how='left', left_on='home_team', right_on='FULL_TEAM_NAME')
+    ah_df.drop(['FULL_TEAM_NAME'],axis=1, inplace=True)
+    ah_df.rename(columns={'TEAM_ID': 'home_team_id'}, inplace=True)
+
     ah_df['winner'] = np.where(ah_df['score_home'] - ah_df['score_away'] > 0, 'home', 'away')
     ah_df['ot'] = ah_df['overtime'].apply(lambda x: 1 if x == True else 0)
     ah_df['home_win'] = ah_df['winner'].apply(lambda x: 1 if x == 'home' else 0)
@@ -246,8 +152,8 @@ def read_n_preprocess_ah_df():
     ah_df['weekDay'] = ah_df['date_time_DT'].dt.dayofweek.astype(int)
 
     for i in range(1, 5):
-        ah_df["new_odd_home_" + str(i)] = ah_df["odd_home_" + str(i)].apply(lambda x: to_decimal(x))
-        ah_df["new_odd_away_" + str(i)] = ah_df["odd_away_" + str(i)].apply(lambda x: to_decimal(x))
+        ah_df["new_odd_home_" + str(i)] = ah_df["odd_home_" + str(i)].apply(lambda x: odg.to_decimal(x))
+        ah_df["new_odd_away_" + str(i)] = ah_df["odd_away_" + str(i)].apply(lambda x: odg.to_decimal(x))
         ah_df["new_odd_home_" + str(i)] = ah_df["new_odd_home_" + str(i)].astype(float)
         ah_df["new_odd_away_" + str(i)] = ah_df["new_odd_away_" + str(i)].astype(float)
 
@@ -264,20 +170,32 @@ def read_n_preprocess_ah_df():
     ah_df['total_score'] = ah_df['score_home'] + ah_df['score_away']
     ah_df['sub_score'] = ah_df['score_home'] - ah_df['score_away']
 
+    # ah_df['bet_winner'] = np.where(float(row['sub_score']) + float(row['ah_'+str(num)]) >= 0, 'home', 'away')
+
     ah_df.rename(columns=lambda x: x.replace(' ', '_'), inplace=True)
     return ah_df
 
 
 def main(unused_argv):
-    ah_df = read_n_preprocess_ah_df()
+    advanced_stat_df = pd.read_json('./advanced_data_slice_201702.json')
+    teams_df = pd.read_json('/Users/ccuulinay/github_proj/scrapy_proj/nba_odds_spider/lab/collection_backup/all_teams.json')
+    teams_df.drop(['TEAM_CITY', 'TEAM_NAME'],axis=1, inplace=True)
+
+    ah_df = read_n_preprocess_ah_df(teams_df)
 
     ah_df = ah_df[COLUMNS]
+    ah_df.sort_values(by=['year', 'month','day'], ascending=[1, 1, 1], inplace=True)
+
+    result_df = pd.merge(advanced_stat_df, ah_df, left_index=True, right_index=True, how='inner')
+
+    NEW_COLUMNS = result_df.columns.tolist()
+    NEW_FEATURES = NEW_COLUMNS[:-5]
 
     # ah_df = pd.DataFrame(ah_df)
     # Defining The Logistic Regression Model
     dnn_model_dir = './ah_model/dnn_model_dir/'
 
-    feature_df = ah_df[FEATURES]
+    feature_df = result_df[NEW_FEATURES]
     label_df = ah_df[LABEL_2]
 
     x_train, x_test, y_train, y_test = train_test_split(feature_df, label_df, test_size=0.3)
@@ -293,20 +211,21 @@ def main(unused_argv):
     # loss_score = ev["loss"]
     # print("Loss: {0:f}".format(loss_score))
     print(np.shape(x_test))
+    y_len = np.shape(x_test)[0]
     y = regressor.predict(input_fn=lambda: input_fn(x_test, y_test))
     # list_y = list(y)
     # print(len(list_y))
-    predictions = list(itertools.islice(y, 928))
+    predictions = list(itertools.islice(y, y_len))
     # print("Predictions: {}".format(str(predictions)))
 
 
-    home_win = ah_df['home_win']
-    sub_score = ah_df['sub_score']
-    payout_df = pd.DataFrame(x_test, columns=FEATURES)
+    home_win = result_df['home_win']
+    sub_score = result_df['sub_score']
+    payout_df = pd.DataFrame(x_test, columns=NEW_FEATURES)
     payout_df['predict_subscore'] = predictions
     payout_df['home_win'] = home_win
     payout_df['sub_score'] = sub_score
-    payout_df['payout_1'] = payout_df.apply(lambda x : calculate_payout(x), axis=1)
+    payout_df['payout_1'] = payout_df.apply(lambda x : odg.calculate_payout(x), axis=1)
     # payout_df['payout_2'] = payout_df.apply(lambda x : calculate_payout(x, num=2), axis=1)
     # payout_df['payout_3'] = payout_df.apply(lambda x : calculate_payout(x, num=3), axis=1)
     # payout_df['payout_4'] = payout_df.apply(lambda x : calculate_payout(x, num=4), axis=1)
