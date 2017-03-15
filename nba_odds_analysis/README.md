@@ -1,3 +1,9 @@
+## I assume that matchup sub-score is related to asian handicap given
+So let's plot the asian handicap and sub-score to try to have a look.
+
+![png](hou_ah_sc.png)
+![png](gs_ah_sc.png)
+![png](cav_ah_sc.png)
 
 
 ```python
