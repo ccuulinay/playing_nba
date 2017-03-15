@@ -1,8 +1,14 @@
 ## I assume that matchup sub-score is related to asian handicap given
 So let's plot the asian handicap and sub-score to try to have a look.
 
+Houston Rockets
+
 ![png](hou_ah_sc.png)
+Golden_State_Warriors
+
 ![png](gs_ah_sc.png)
+Cleveland_Cavaliers
+
 ![png](cav_ah_sc.png)
 
 
