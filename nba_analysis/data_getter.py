@@ -1,6 +1,7 @@
 import pandas as pd
 import requests
 import os
+from lxml import etree
 
 # Fix non-browser request issue
 HEADERS = {
@@ -256,3 +257,49 @@ def get_one_pp_to_text(df, column_list=None):
     main_feat = df[column_list].copy()
     main_text = main_feat.to_csv(index=False, header=False)
     return main_text
+
+
+def get_bbr_nickname_player_of_week_list(after_2001=True):
+    bbr_pow_url = "https://www.basketball-reference.com/awards/pow.html"
+
+    # get the web page
+    response = requests.get(bbr_pow_url, headers=HEADERS)
+    response.raise_for_status()
+
+    root = etree.HTML(response.content)
+    years_pows = root.xpath("//*[@id='div_']/div")
+    after2001_column_names = ['season', 'week', 'eastern_pow_nickname', 'western_pow_nickname']
+    before2001_column_names = ['season', 'week', '1st_pow_nickname', '2nd_pow_nickname']
+
+    after2001_pows_list = []
+    before2001_pows_list = []
+    for year_pows in years_pows:
+        season = year_pows.xpath("./h3/text()")[0]
+        weeks_pows = year_pows.xpath("./*[@class='data_grid_box']/div[2]/p")
+        for week_pows in weeks_pows:
+            week = week_pows.xpath("./strong[1]/text()")[0]
+            # print(week)
+            if (int(season.split("-")[0])) >= 2001:
+                east_pow_nic = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
+                west_pow_nic = week_pows.xpath("./a[2]/@href")[0].split("/")[-1].split(".")[0]
+                pows = [season, week, east_pow_nic, west_pow_nic]
+                after2001_pows_list.append(pows)
+            else:
+                pows = week_pows.xpath("./a")
+                if len(pows) > 1:
+                    st_pow_nickname = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
+                    nd_pow_nickname = week_pows.xpath("./a[2]/@href")[0].split("/")[-1].split(".")[0]
+                else:
+                    st_pow_nickname = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
+                    nd_pow_nickname = ""
+                pows = [season, week, st_pow_nickname, nd_pow_nickname]
+                before2001_pows_list.append(pows)
+
+    after2001_df = pd.DataFrame(after2001_pows_list, columns=after2001_column_names)
+    before2001_df = pd.DataFrame(before2001_pows_list, columns=before2001_column_names)
+
+    if after_2001:
+        return after2001_df
+    else:
+        return before2001_df
+
