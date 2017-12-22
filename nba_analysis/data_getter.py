@@ -9,6 +9,82 @@ HEADERS = {
 }
 
 
+def get_team_games_log(team_id=0, season='2017-18',
+                                     season_type="Regular Season"):
+    """
+
+    :param team_id:
+    :param season:
+    :param season_type:
+    :return:
+    """
+    base_url = "http://stats.nba.com/stats/teamgamelog?"
+    url_parameters = {
+                                "TeamID": str(team_id),
+                                "LeagueID": "00",
+                                "Season": season,
+                                "SeasonType": season_type
+                            }
+
+    # get the web page
+    response = requests.get(base_url, params=url_parameters,headers=HEADERS)
+    response.raise_for_status()
+
+    # The 'header' key accesses the headers
+    headers = response.json()['resultSets'][0]['headers']
+    # The 'rowSet' key contains the teams data along with their IDs
+    teams = response.json()['resultSets'][0]['rowSet']
+    # Create dataframe with proper numeric types
+    df = pd.DataFrame(teams, columns=headers)
+    df.GAME_DATE = pd.to_datetime(df.GAME_DATE)
+    return df
+
+
+
+def get_player_games_log(player_id, season='2017-18',
+                         begin_date="", end_date="", measureType='Base', season_type="Regular Season",
+                         OpponentTeamID=0,Outcome=""):
+    """
+
+    :param player_id:
+    :param season:
+    :param measureType: one of 'Base', 'Advanced', 'Four+Factors', 'Misc', 'Scoring', 'Opponent', 'Defense'
+    :param begin_date: MM/DD/YYYY
+    :param end_date: MM/DD/YYYY
+    :param season_type:
+    :param OpponentTeamID:
+    :param Outcome:
+    :return:
+    """
+    base_url = "http://stats.nba.com/stats/playergamelogs?"
+    url_parameters = {
+        "DateFrom": begin_date,
+        "DateTo": end_date,
+        "GameSegment": "",
+        "LastNGames": "",
+        "LeagueID": str("00"),
+        "Season": season,
+        "SeasonType": season_type,
+        "PlayerID": str(player_id),
+        "MeasureType": measureType,
+        "OpponentTeamID": str(OpponentTeamID),
+        "Outcome":Outcome
+    }
+    # get the web page
+    response = requests.get(base_url, params=url_parameters, headers=HEADERS)
+    response.raise_for_status()
+
+    # The 'header' key accesses the headers
+    headers = response.json()['resultSets'][0]['headers']
+    # The 'rowSet' key contains the teams data along with their IDs
+    players = response.json()['resultSets'][0]['rowSet']
+    # Create dataframe with proper numeric types
+    df = pd.DataFrame(players, columns=headers)
+    df.GAME_DATE = pd.to_datetime(df.GAME_DATE)
+    return df
+
+
+
 def get_league_dash_team_stats_to_df(season='2016-17', m=0, measureType='Base', begin_date="", end_date="",
                                      season_type="Regular+Season"):
     """
