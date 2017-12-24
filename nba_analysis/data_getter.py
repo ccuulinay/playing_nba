@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 import os
 from lxml import etree
+import urllib
 
 # Fix non-browser request issue
 HEADERS = {
@@ -40,6 +41,32 @@ def get_team_games_log(team_id=0, season='2017-18',
     df.GAME_DATE = pd.to_datetime(df.GAME_DATE)
     return df
 
+
+def get_all_players_n_teams_ids(season='2017-18', IsOnlyCurrentSeason="0"):
+
+    base_url = "http://stats.nba.com/stats/commonallplayers?"
+    url_parameters = {
+        "LeagueID": "00",
+        "Season": season,
+        "IsOnlyCurrentSeason" : IsOnlyCurrentSeason
+    }
+
+    # get the web page
+    response = requests.get(base_url, params=url_parameters,headers=HEADERS)
+    response.raise_for_status()
+
+    # The 'header' key accesses the headers
+    headers = response.json()['resultSets'][0]['headers']
+    # The 'rowSet' key contains the data along with their IDs
+    content = response.json()['resultSets'][0]['rowSet']
+    # Create dataframe with proper numeric types
+    df = pd.DataFrame(content, columns=headers)
+    df = df.convert_objects(convert_numeric=True)
+
+    t_df = pd.DataFrame({"TEAM_NAME": df.TEAM_NAME.unique(),
+                        "TEAM_ID": df.TEAM_ID.unique()})
+
+    return df, t_df
 
 
 def get_player_games_log(player_id, season='2017-18',
@@ -260,6 +287,16 @@ def get_one_pp_to_text(df, column_list=None):
 
 
 def get_bbr_nickname_player_of_week_list(after_2001=True):
+    """
+
+    :param after_2001:
+    :return:
+    """
+    player_mapping_url = "https://d2cwpp38twqe55.cloudfront.net/short/inc/players_search_list.csv"
+    player_mapping_csv = "data/BBR/players_search_list.csv"
+    column_names = ['nickname', 'fullname','career_seasons','active_service']
+    player_mapping_df = pd.read_csv(player_mapping_csv, header=None, names=column_names)
+
     bbr_pow_url = "https://www.basketball-reference.com/awards/pow.html"
 
     # get the web page
@@ -268,8 +305,11 @@ def get_bbr_nickname_player_of_week_list(after_2001=True):
 
     root = etree.HTML(response.content)
     years_pows = root.xpath("//*[@id='div_']/div")
-    after2001_column_names = ['season', 'week', 'eastern_pow_nickname', 'western_pow_nickname']
-    before2001_column_names = ['season', 'week', '1st_pow_nickname', '2nd_pow_nickname']
+    # after2001_column_names = ['season', 'week', 'eastern_pow_nickname', 'western_pow_nickname']
+    # before2001_column_names = ['season', 'week', '1st_pow_nickname', '2nd_pow_nickname']
+
+    after2001_column_names = ['season', 'week', 'eastern_pow_name', 'western_pow_name']
+    before2001_column_names = ['season', 'week', '1st_pow_name', '2nd_pow_name']
 
     after2001_pows_list = []
     before2001_pows_list = []
@@ -281,18 +321,25 @@ def get_bbr_nickname_player_of_week_list(after_2001=True):
             # print(week)
             if (int(season.split("-")[0])) >= 2001:
                 east_pow_nic = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
+                east_pow_name = player_mapping_df[player_mapping_df.nickname == east_pow_nic].fullname.values[0]
                 west_pow_nic = week_pows.xpath("./a[2]/@href")[0].split("/")[-1].split(".")[0]
-                pows = [season, week, east_pow_nic, west_pow_nic]
+                west_pow_name = player_mapping_df[player_mapping_df.nickname == west_pow_nic].fullname.values[0]
+                pows = [season, week, east_pow_name, west_pow_name]
                 after2001_pows_list.append(pows)
             else:
                 pows = week_pows.xpath("./a")
                 if len(pows) > 1:
                     st_pow_nickname = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
+                    st_pow_name = player_mapping_df[player_mapping_df.nickname == st_pow_nickname].fullname.values[0]
                     nd_pow_nickname = week_pows.xpath("./a[2]/@href")[0].split("/")[-1].split(".")[0]
+                    nd_pow_name = player_mapping_df[player_mapping_df.nickname == nd_pow_nickname].fullname.values[0]
+
                 else:
                     st_pow_nickname = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
-                    nd_pow_nickname = ""
-                pows = [season, week, st_pow_nickname, nd_pow_nickname]
+                    st_pow_name = player_mapping_df[player_mapping_df.nickname == st_pow_nickname].fullname.values[0]
+                    nd_pow_name = ""
+
+                pows = [season, week, st_pow_name, nd_pow_name]
                 before2001_pows_list.append(pows)
 
     after2001_df = pd.DataFrame(after2001_pows_list, columns=after2001_column_names)
@@ -302,4 +349,11 @@ def get_bbr_nickname_player_of_week_list(after_2001=True):
         return after2001_df
     else:
         return before2001_df
+
+
+def get_player_img(player_id, path):
+    url = "http://stats.nba.com/media/players/230x185/"+str(player_id)+".png"
+    img_file = os.path.join(path, str(player_id) + ".png")
+    pic = urllib.urlretrieve(url, img_file)
+
 
