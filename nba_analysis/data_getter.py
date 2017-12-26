@@ -3,6 +3,7 @@ import requests
 import os
 from lxml import etree
 import urllib
+import datetime
 
 # Fix non-browser request issue
 HEADERS = {
@@ -110,7 +111,6 @@ def get_player_games_log(player_id, season='2017-18',
     df = pd.DataFrame(players, columns=headers)
     df.GAME_DATE = pd.to_datetime(df.GAME_DATE)
     return df
-
 
 
 def get_league_dash_team_stats_to_df(season='2016-17', m=0, measureType='Base', begin_date="", end_date="",
@@ -308,8 +308,8 @@ def get_bbr_nickname_player_of_week_list(after_2001=True):
     # after2001_column_names = ['season', 'week', 'eastern_pow_nickname', 'western_pow_nickname']
     # before2001_column_names = ['season', 'week', '1st_pow_nickname', '2nd_pow_nickname']
 
-    after2001_column_names = ['season', 'week', 'eastern_pow_name', 'western_pow_name']
-    before2001_column_names = ['season', 'week', '1st_pow_name', '2nd_pow_name']
+    after2001_column_names = ['season', 'week', 'division', 'pow_name', 'REWARD_DATE']
+    # before2001_column_names = ['season', 'week', '1st_pow_name', '2nd_pow_name', 'REWARD_DATE']
 
     after2001_pows_list = []
     before2001_pows_list = []
@@ -318,14 +318,17 @@ def get_bbr_nickname_player_of_week_list(after_2001=True):
         weeks_pows = year_pows.xpath("./*[@class='data_grid_box']/div[2]/p")
         for week_pows in weeks_pows:
             week = week_pows.xpath("./strong[1]/text()")[0]
+            rdate_string = get_date_from_season_n_week(season, week)
             # print(week)
             if (int(season.split("-")[0])) >= 2001:
                 east_pow_nic = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
                 east_pow_name = player_mapping_df[player_mapping_df.nickname == east_pow_nic].fullname.values[0]
                 west_pow_nic = week_pows.xpath("./a[2]/@href")[0].split("/")[-1].split(".")[0]
                 west_pow_name = player_mapping_df[player_mapping_df.nickname == west_pow_nic].fullname.values[0]
-                pows = [season, week, east_pow_name, west_pow_name]
-                after2001_pows_list.append(pows)
+                e_pows = [season, week, "east", east_pow_name, rdate_string]
+                w_pows = [season, week, "west", west_pow_name, rdate_string]
+                after2001_pows_list.append(e_pows)
+                after2001_pows_list.append(w_pows)
             else:
                 pows = week_pows.xpath("./a")
                 if len(pows) > 1:
@@ -333,17 +336,23 @@ def get_bbr_nickname_player_of_week_list(after_2001=True):
                     st_pow_name = player_mapping_df[player_mapping_df.nickname == st_pow_nickname].fullname.values[0]
                     nd_pow_nickname = week_pows.xpath("./a[2]/@href")[0].split("/")[-1].split(".")[0]
                     nd_pow_name = player_mapping_df[player_mapping_df.nickname == nd_pow_nickname].fullname.values[0]
-
+                    st_pows = [season, week, "", st_pow_name, rdate_string]
+                    nd_pows = [season, week, "", nd_pow_name, rdate_string]
+                    before2001_pows_list.append(st_pows)
+                    before2001_pows_list.append(nd_pows)
                 else:
                     st_pow_nickname = week_pows.xpath("./a[1]/@href")[0].split("/")[-1].split(".")[0]
                     st_pow_name = player_mapping_df[player_mapping_df.nickname == st_pow_nickname].fullname.values[0]
-                    nd_pow_name = ""
-
-                pows = [season, week, st_pow_name, nd_pow_name]
-                before2001_pows_list.append(pows)
+                    st_pows = [season, week, "", st_pow_name, rdate_string]
+                    before2001_pows_list.append(st_pows)
 
     after2001_df = pd.DataFrame(after2001_pows_list, columns=after2001_column_names)
-    before2001_df = pd.DataFrame(before2001_pows_list, columns=before2001_column_names)
+    before2001_df = pd.DataFrame(before2001_pows_list, columns=after2001_column_names)
+
+    after2001_df.sort_values(['REWARD_DATE'], inplace=True)
+    after2001_df.reset_index(inplace=True, drop=True)
+    before2001_df.sort_values(['REWARD_DATE'], inplace=True)
+    before2001_df.reset_index(inplace=True, drop=True)
 
     if after_2001:
         return after2001_df
@@ -357,3 +366,23 @@ def get_player_img(player_id, path):
     pic = urllib.urlretrieve(url, img_file)
 
 
+"""
+Utils
+"""
+
+
+def get_date_from_season_n_week(season, week):
+    fh_year = int(season.split("-")[0])
+    sh_year = fh_year + 1
+
+    mn = str(week).split()[0]
+    if mn in ['Sep', 'Oct', 'Nov', 'Dec']:
+        year_s = str(fh_year)
+    else:
+        year_s = str(sh_year)
+
+    s_d = week + " " + str(year_s)
+    d = datetime.datetime.strptime(s_d, "%b %d %Y")
+    target_date_string = d.strftime('%m/%d/%Y')
+    # return str(target_date_string)
+    return d
