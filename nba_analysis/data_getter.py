@@ -4,6 +4,11 @@ import os
 from lxml import etree
 import urllib
 import datetime
+try:
+    from urllib import urlretrieve  # python 2 compatible
+except:
+    from urllib.request import urlretrieve  # python 3 compatible
+
 
 # Fix non-browser request issue
 HEADERS = {
