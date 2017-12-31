@@ -1,5 +1,6 @@
 import json
 import datetime
+from datetime import timedelta, timezone
 import scrapy
 from scrapy.http.headers import Headers
 from scrapy import Spider
@@ -19,10 +20,22 @@ class QTOddsAHSpider(Spider):
     allowed_domains = ["nowgoal.com"]
 
     start_urls = []
-    start_year = 2005
-    # start_year = 2017
-    end_year = 2017
-    # end_year = 2018
+    # start_year = 2005
+    start_year = 2017
+    # end_year = 2017
+    end_year = 2018
+
+    # If you would like to query from exactly date range, set below to True and set start_year and end_year above to
+    # corresponding years
+    # If set to False, will scratch thw whole year's games.
+    day_query_flag = True
+    # day_query_flag = False
+    start_date_string = "2018-01-01"
+    end_date_string = "2018-01-01"
+    # start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d")
+    # end_date_obj = datetime.datetime.strptime(end_date_string, "%Y-%m-%d")
+    start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d").astimezone(timezone(timedelta(hours=-8)))
+    end_date_obj = datetime.datetime.strptime(end_date_string, "%Y-%m-%d").astimezone(timezone(timedelta(hours=-8)))
 
     for x in range(start_year, end_year):
         season_full_string = str(x) + "-" + str(x+1)
@@ -69,7 +82,7 @@ class QTOddsAHSpider(Spider):
             )
 
     def parse_odds_page(self, response):
-        today = datetime.datetime.now()
+        today = datetime.datetime.utcnow().replace(tzinfo=timezone.utc)
         item = QiutanOddsSpiderItem()
 
         date_param = response.meta['date_param']
@@ -80,71 +93,141 @@ class QTOddsAHSpider(Spider):
         tr_list = response.xpath("//*[@id='scheTab']/tbody/tr")
         # First row would be column names
         tr_list = tr_list[1:]
-        for tr in tr_list:
-            if len(tr.xpath("td")) <= 1:
-                row_date_string = tr.xpath("td/strong/text()").extract()[0]
-                row_date_string = row_date_string.split()[0]
-                row_d = datetime.datetime.strptime(row_date_string, "%Y-%m-%d")
-                if row_d > today:
-                    break
+        if not self.day_query_flag:
+            for tr in tr_list:
+                if len(tr.xpath("td")) <= 1:
+                    row_date_string = tr.xpath("td/strong/text()").extract()[0]
+                    row_date_string = row_date_string.split()[0]
+                    row_d = datetime.datetime.strptime(row_date_string, "%Y-%m-%d")
+                    if row_d.date() > today.date():
+                        break
+                    else:
+                        # Skip the date row
+                        continue
+
                 else:
-                    # Skip the date row
-                    continue
+                    td_list = tr.xpath("td")
 
-            else:
-                td_list = tr.xpath("td")
+                    try:
+                        game_type = td_list[0].xpath("text()").extract()[0]
+                    except:
+                        game_type = ""
 
+                    try:
+                        game_date = y + "-" + " ".join(td_list[1].xpath("text()").extract())
+                    except:
+                        game_date = ""
 
+                    try:
+                        home_team_name = td_list[2].xpath("a/text()").extract()[0]
+                    except:
+                        home_team_name = ""
+                    try:
+                        home_score = td_list[3].xpath("a/span[1]/text()").extract()[0]
+                    except:
+                        home_score = ""
 
-                try:
-                    game_type = td_list[0].xpath("text()").extract()[0]
-                except:
-                    game_type = ""
+                    try:
+                        away_score = td_list[3].xpath("a/span[2]/text()").extract()[0]
+                    except:
+                        away_score = ""
+                    try:
+                        away_team_name = td_list[4].xpath("a/text()").extract()[0]
+                    except:
+                        away_team_name = ""
+                    try:
+                        handicap = td_list[5].xpath("text()").extract()[0]
+                    except:
+                        handicap = ""
+                    try:
+                        o_u = td_list[6].xpath("text()").extract()[0]
+                    except:
+                        o_u = ""
 
-                try:
-                    game_date = y + "-" + " ".join(td_list[1].xpath("text()").extract())
-                except:
-                    game_date = ""
+                    ## Update: Adding download time##
+                    download_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 
-                try:
-                    home_team_name = td_list[2].xpath("a/text()").extract()[0]
-                except:
-                    home_team_name = ""
-                try:
-                    home_score = td_list[3].xpath("a/span[1]/text()").extract()[0]
-                except:
-                    home_score = ""
+                    item['GAME_TYPE'] = game_type
+                    item['GAME_DATE'] = game_date
+                    item['home_team_name'] = home_team_name
+                    item['home_score'] = home_score
+                    item['away_team_name'] = away_team_name
+                    item['away_score'] = away_score
+                    item['handicap'] = handicap
+                    item['O_and_U'] = o_u
+                    item['DOWNLOAD_DATE'] = download_date_time
+                    yield item
+        else:
+            spider_flag = False
+            for tr in tr_list:
+                if len(tr.xpath("td")) <= 1:
+                    row_date_string = tr.xpath("td/strong/text()").extract()[0]
+                    row_date_string = row_date_string.split()[0]
+                    row_d = datetime.datetime.strptime(row_date_string, "%Y-%m-%d")
+                    if self.start_date_obj.date() <= row_d.date() <= self.end_date_obj.date():
+                        spider_flag = True
+                        continue
 
-                try:
-                    away_score = td_list[3].xpath("a/span[2]/text()").extract()[0]
-                except:
-                    away_score = ""
-                try:
-                    away_team_name = td_list[4].xpath("a/text()").extract()[0]
-                except:
-                    away_team_name = ""
-                try:
-                    handicap = td_list[5].xpath("text()").extract()[0]
-                except:
-                    handicap = ""
-                try:
-                    o_u = td_list[6].xpath("text()").extract()[0]
-                except:
-                    o_u = ""
+                    elif row_d.date() > self.end_date_obj.date():
+                        break
+                    elif row_d.date() > (today + datetime.timedelta(days=1)).date():
+                        # Skip the date row
+                        break
+                    else:
+                        continue
+                else:
+                    if spider_flag:
+                        td_list = tr.xpath("td")
 
-                ## Update: Adding download time##
-                download_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                        try:
+                            game_type = td_list[0].xpath("text()").extract()[0]
+                        except:
+                            game_type = ""
 
-                item['GAME_TYPE'] = game_type
-                item['GAME_DATE'] = game_date
-                item['home_team_name'] = home_team_name
-                item['home_score'] = home_score
-                item['away_team_name'] = away_team_name
-                item['away_score'] = away_score
-                item['handicap'] = handicap
-                item['O_and_U'] = o_u
-                item['DOWNLOAD_DATE'] = download_date_time
-                yield item
+                        try:
+                            game_date = y + "-" + " ".join(td_list[1].xpath("text()").extract())
+                        except:
+                            game_date = ""
+
+                        try:
+                            home_team_name = td_list[2].xpath("a/text()").extract()[0]
+                        except:
+                            home_team_name = ""
+                        try:
+                            home_score = td_list[3].xpath("a/span[1]/text()").extract()[0]
+                        except:
+                            home_score = ""
+
+                        try:
+                            away_score = td_list[3].xpath("a/span[2]/text()").extract()[0]
+                        except:
+                            away_score = ""
+                        try:
+                            away_team_name = td_list[4].xpath("a/text()").extract()[0]
+                        except:
+                            away_team_name = ""
+                        try:
+                            handicap = td_list[5].xpath("text()").extract()[0]
+                        except:
+                            handicap = ""
+                        try:
+                            o_u = td_list[6].xpath("text()").extract()[0]
+                        except:
+                            o_u = ""
+
+                        ## Update: Adding download time##
+                        download_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+
+                        item['GAME_TYPE'] = game_type
+                        item['GAME_DATE'] = game_date
+                        item['home_team_name'] = home_team_name
+                        item['home_score'] = home_score
+                        item['away_team_name'] = away_team_name
+                        item['away_score'] = away_score
+                        item['handicap'] = handicap
+                        item['O_and_U'] = o_u
+                        item['DOWNLOAD_DATE'] = download_date_time
+                        yield item
 
 
 
