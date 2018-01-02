@@ -20,15 +20,15 @@ class QTOddsAHSpider(Spider):
     allowed_domains = ["nowgoal.com"]
 
     start_urls = []
-    # start_year = 2005
-    start_year = 2017
+    start_year = 2005
+    # start_year = 2017
     # end_year = 2017
     end_year = 2018
 
     # If you would like to query from exactly date range, set below to True and set start_year and end_year above to
     # corresponding years
     # If set to False, will scratch thw whole year's games.
-    day_query_flag = True
+    day_query_flag = False
     # day_query_flag = False
     start_date_string = "2018-01-01"
     end_date_string = "2018-01-01"
@@ -66,9 +66,9 @@ class QTOddsAHSpider(Spider):
                 continue
             else:
                 m = str(t_str)
-                if y and m:
-                    param_str = "y=" + y + "&m=" + m
-                    date_param_list.append(param_str)
+            if y and m:
+                param_str = "y=" + y + "&m=" + m
+                date_param_list.append(param_str)
         matchSeason = "-".join(y_list)
 
         for date_param in date_param_list:
