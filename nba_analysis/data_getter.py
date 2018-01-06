@@ -17,6 +17,34 @@ HEADERS = {
 }
 
 
+def get_scoreboardV2_given_date(game_date, DayOffset='0', LeagueID='00'):
+    """
+
+    :param game_date:  MM/DD/YYYY
+    :param DayOffset:
+    :param LeagueID:
+    :return:
+    """
+    base_url = "https://stats.nba.com/stats/scoreboardV2?"
+    url_parameters = {
+        "DayOffset": DayOffset,
+        "LeagueID": LeagueID,
+        "game_date": str(game_date)
+    }
+    # get the web page
+    response = requests.get(base_url, params=url_parameters,headers=HEADERS)
+    response.raise_for_status()
+
+    # The 'header' key accesses the headers
+    headers = response.json()['resultSets'][0]['headers']
+    # The 'rowSet' key contains the teams data along with their IDs
+    teams = response.json()['resultSets'][0]['rowSet']
+    # Create dataframe with proper numeric types
+    df = pd.DataFrame(teams, columns=headers)
+    df.GAME_DATE_EST = pd.to_datetime(df.GAME_DATE_EST)
+    return df
+
+
 def get_team_games_log(team_id=0, season='2017-18',
                                      season_type="Regular Season"):
     """
