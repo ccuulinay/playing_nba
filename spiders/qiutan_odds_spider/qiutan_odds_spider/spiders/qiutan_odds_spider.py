@@ -30,8 +30,8 @@ class QTOddsAHSpider(Spider):
     # If set to False, will scratch thw whole year's games.
     day_query_flag = False
     # day_query_flag = False
-    start_date_string = "2018-01-01"
-    end_date_string = "2018-01-01"
+    start_date_string = "2018-01-06"
+    end_date_string = "2018-01-06"
     # start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d")
     # end_date_obj = datetime.datetime.strptime(end_date_string, "%Y-%m-%d")
     start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d").astimezone(timezone(timedelta(hours=-8)))
@@ -106,6 +106,7 @@ class QTOddsAHSpider(Spider):
                         continue
 
                 else:
+                    odds_list_url_list = []
                     td_list = tr.xpath("td")
 
                     try:
@@ -144,9 +145,37 @@ class QTOddsAHSpider(Spider):
                     except:
                         o_u = ""
 
+                    try:
+                        odds_list_url = td_list[7].xpath("a[1]/@href").extract()[0]
+                        odds_list_url_list.append(odds_list_url)
+                        qiutan_game_id =  odds_list_url.split('/')[-1].split('.')[0]
+                        # print(qiutan_game_id)
+                    except:
+                        odds_list_url = ""
+                        qiutan_game_id = ""
+
                     ## Update: Adding download time##
                     download_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 
+                    meta_item = dict()
+                    meta_item['GAME_TYPE'] = game_type
+                    meta_item['GAME_DATE'] = game_date
+                    meta_item['home_team_name'] = home_team_name
+                    meta_item['home_score'] = home_score
+                    meta_item['away_team_name'] = away_team_name
+                    meta_item['away_score'] = away_score
+                    meta_item['handicap'] = handicap
+                    meta_item['O_and_U'] = o_u
+                    meta_item['DOWNLOAD_DATE'] = download_date_time
+                    meta_item['qiutan_game_id'] = qiutan_game_id
+
+                    if odds_list_url:
+                        yield SplashRequest(odds_list_url, self.parse_odds_list_page, args={
+                                'wait': 0.5, 'html': 1, 'timeout': 3600,
+                            }, headers=HEADERS,
+                            meta={'meta_item': meta_item}
+                        )
+                    """
                     item['GAME_TYPE'] = game_type
                     item['GAME_DATE'] = game_date
                     item['home_team_name'] = home_team_name
@@ -157,6 +186,7 @@ class QTOddsAHSpider(Spider):
                     item['O_and_U'] = o_u
                     item['DOWNLOAD_DATE'] = download_date_time
                     yield item
+                    """
         else:
             spider_flag = False
             for tr in tr_list:
@@ -177,6 +207,7 @@ class QTOddsAHSpider(Spider):
                         continue
                 else:
                     if spider_flag:
+                        odds_list_url_list = []
                         td_list = tr.xpath("td")
 
                         try:
@@ -215,9 +246,39 @@ class QTOddsAHSpider(Spider):
                         except:
                             o_u = ""
 
+
+                        try:
+                            odds_list_url = td_list[7].xpath("a[1]/@href").extract()[0]
+                            odds_list_url_list.append(odds_list_url)
+                            qiutan_game_id =  odds_list_url.split('/')[-1].split('.')[0]
+                            # print(qiutan_game_id)
+                        except:
+                            odds_list_url = ""
+                            qiutan_game_id = ""
+
+
                         ## Update: Adding download time##
                         download_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 
+                        meta_item = dict()
+                        meta_item['GAME_TYPE'] = game_type
+                        meta_item['GAME_DATE'] = game_date
+                        meta_item['home_team_name'] = home_team_name
+                        meta_item['home_score'] = home_score
+                        meta_item['away_team_name'] = away_team_name
+                        meta_item['away_score'] = away_score
+                        meta_item['handicap'] = handicap
+                        meta_item['O_and_U'] = o_u
+                        meta_item['DOWNLOAD_DATE'] = download_date_time
+                        meta_item['qiutan_game_id'] = qiutan_game_id
+
+                        if odds_list_url:
+                            yield SplashRequest(odds_list_url, self.parse_odds_list_page, args={
+                                    'wait': 0.5, 'html': 1, 'timeout': 3600,
+                                }, headers=HEADERS,
+                                meta={'meta_item': meta_item}
+                            )
+                        """
                         item['GAME_TYPE'] = game_type
                         item['GAME_DATE'] = game_date
                         item['home_team_name'] = home_team_name
@@ -228,13 +289,103 @@ class QTOddsAHSpider(Spider):
                         item['O_and_U'] = o_u
                         item['DOWNLOAD_DATE'] = download_date_time
                         yield item
+                        """
 
+    def parse_odds_list_page(self, response):
+        item = QiutanOddsSpiderItem()
+        meta_item = response.meta['meta_item']
 
+        tr_list = response.xpath("//*[@id='main']/table/tbody/tr[2]/td[1]/table[1]/tbody/tr[contains(@class,'te')]")
+        if len(tr_list) > 5:
+            tr_list = tr_list[:5]
+        for i, tr in enumerate(tr_list):
+            td_list = tr.xpath("td")
 
+            try:
+                company_name = td_list[0].xpath("text()").extract()[0]
+            except:
+                company_name = ""
 
+            try:
+                company_init_ah_home_odds = td_list[1].xpath("text()").extract()[0]
+            except:
+                company_init_ah_home_odds = ""
+            try:
+                company_curr_ah_home_odds = td_list[1].xpath("span/text()").extract()[0]
+            except:
+                company_curr_ah_home_odds = ""
 
+            try:
+                company_init_handicap = td_list[2].xpath("text()").extract()[0]
+            except:
+                company_init_handicap = ""
+            try:
+                company_curr_handicap = td_list[2].xpath("span/text()").extract()[0]
+            except:
+                company_curr_handicap = ""
 
+            try:
+                company_init_ah_away_odds = td_list[3].xpath("text()").extract()[0]
+            except:
+                company_init_ah_away_odds = ""
+            try:
+                company_curr_ah_away_odds = td_list[3].xpath("span/text()").extract()[0]
+            except:
+                company_curr_ah_away_odds = ""
 
+            try:
+                company_init_ou_home_odds = td_list[4].xpath("text()").extract()[0]
+            except:
+                company_init_ou_home_odds = ""
+            try:
+                company_curr_ou_home_odds = td_list[4].xpath("span/text()").extract()[0]
+            except:
+                company_curr_ou_home_odds = ""
+
+            try:
+                company_init_ou = td_list[5].xpath("text()").extract()[0]
+            except:
+                company_init_ou = ""
+            try:
+                company_curr_ou = td_list[5].xpath("span/text()").extract()[0]
+            except:
+                company_curr_ou = ""
+
+            try:
+                company_init_ou_away_odds = td_list[6].xpath("text()").extract()[0]
+            except:
+                company_init_ou_away_odds = ""
+            try:
+                company_curr_ou_away_odds = td_list[6].xpath("span/text()").extract()[0]
+            except:
+                company_curr_ou_away_odds = ""
+
+            item['company_'+str(i+1)+'_name'] = company_name
+            item['company_'+str(i+1)+'_init_handicap'] = company_init_handicap
+            item['company_'+str(i+1)+'_init_ah_home_odds'] = company_init_ah_home_odds
+            item['company_'+str(i+1)+'_init_ah_away_odds'] = company_init_ah_away_odds
+            item['company_'+str(i+1)+'_init_ou'] = company_init_ou
+            item['company_'+str(i+1)+'_init_ou_home_odds'] = company_init_ou_home_odds
+            item['company_'+str(i+1)+'_init_ou_away_odds'] = company_init_ou_away_odds
+            item['company_'+str(i+1)+'_curr_handicap'] = company_curr_handicap
+            item['company_'+str(i+1)+'_curr_ah_home_odds'] = company_curr_ah_home_odds
+            item['company_'+str(i+1)+'_curr_ah_away_odds'] = company_curr_ah_away_odds
+            item['company_'+str(i+1)+'_curr_ou'] = company_curr_ou
+            item['company_'+str(i+1)+'_curr_ou_home_odds'] = company_curr_ou_home_odds
+            item['company_'+str(i+1)+'_curr_ou_away_odds'] = company_curr_ou_away_odds
+
+        item['GAME_TYPE'] = meta_item['GAME_TYPE']
+        item['GAME_DATE'] = meta_item['GAME_DATE']
+        item['home_team_name'] = meta_item['home_team_name']
+        item['home_score'] = meta_item['home_score']
+        item['away_team_name'] = meta_item['away_team_name']
+        item['away_score'] = meta_item['away_score']
+        item['DOWNLOAD_DATE'] = meta_item['DOWNLOAD_DATE']
+        item['handicap'] = meta_item['handicap']
+        item['O_and_U'] = meta_item['O_and_U']
+        item['qiutan_game_id'] = meta_item['qiutan_game_id']
+
+        yield item
 
 
 
