@@ -20,18 +20,18 @@ class QTOddsAHSpider(Spider):
     allowed_domains = ["nowgoal.com"]
 
     start_urls = []
-    start_year = 2005
-    # start_year = 2017
+    # start_year = 2005
+    start_year = 2017
     # end_year = 2017
     end_year = 2018
 
     # If you would like to query from exactly date range, set below to True and set start_year and end_year above to
     # corresponding years
     # If set to False, will scratch thw whole year's games.
-    day_query_flag = False
+    day_query_flag = True
     # day_query_flag = False
-    start_date_string = "2018-01-06"
-    end_date_string = "2018-01-06"
+    start_date_string = "2018-01-01"
+    end_date_string = "2018-01-14"
     # start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d")
     # end_date_obj = datetime.datetime.strptime(end_date_string, "%Y-%m-%d")
     start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d").astimezone(timezone(timedelta(hours=-8)))
@@ -258,7 +258,7 @@ class QTOddsAHSpider(Spider):
 
 
                         ## Update: Adding download time##
-                        download_date_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                        download_date_time = datetime.datetime.utcnow().replace(tzinfo=timezone.utc).strftime('%Y-%m-%d %H:%M')
 
                         meta_item = dict()
                         meta_item['GAME_TYPE'] = game_type
