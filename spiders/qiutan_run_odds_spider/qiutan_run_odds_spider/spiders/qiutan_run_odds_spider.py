@@ -13,6 +13,7 @@ HEADERS = {
 }
 base_url = "http://nba.nowgoal.com/cn/Normal/"
 
+
 class QTRunOddsSpider(Spider):
     name = "qiutan_run_odds_spider"
     allowed_domains = ["nowgoal.com"]
@@ -28,7 +29,7 @@ class QTRunOddsSpider(Spider):
     # If set to False, will scratch thw whole year's games.
     day_query_flag = True
     # day_query_flag = False
-    start_date_string = "2018-01-01"
+    start_date_string = "2018-01-14"
     end_date_string = "2018-01-14"
     # start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d")
     # end_date_obj = datetime.datetime.strptime(end_date_string, "%Y-%m-%d")
@@ -210,9 +211,7 @@ class QTRunOddsSpider(Spider):
                                 meta={'meta_item': meta_item}
                             )
 
-
     def parse_odds_list_page(self, response):
-        item = QiutanRunOddsSpiderItem()
         meta_item = response.meta['meta_item']
 
         tr_list = response.xpath("//*[@id='main']/table/tbody/tr[2]/td[1]/table[1]/tbody/tr[contains(@class,'te')]")
@@ -227,7 +226,8 @@ class QTRunOddsSpider(Spider):
                 company_name = ""
 
             try:
-                detail_url = td_list[7].xpath("a[0]/@href").extract()[0]
+                print(td_list[7].xpath("a/@href").extract())
+                detail_url = td_list[7].xpath("a/@href").extract()[0]
             except:
                 detail_url=""
 
@@ -240,7 +240,7 @@ class QTRunOddsSpider(Spider):
                 )
 
     def parse_run_odds_page(self, response):
-        item = QiutanRunOddsSpiderItem()
+        print("+++++++++++++++++++++++++++++++")
         meta_item = response.meta['meta_item']
 
         tr_list = response.xpath("//*[@id='content']/table/tbody/tr/td[1]/table/tbody/tr")
@@ -271,7 +271,7 @@ class QTRunOddsSpider(Spider):
             except:
                 curr_ah_away_odds = ""
             try:
-                odds_status = td_list[4].xpath("text()").extract()[0]
+                odds_status = td_list[6].xpath("text()").extract()[0]
             except:
                 odds_status = ""
 
@@ -296,4 +296,5 @@ class QTRunOddsSpider(Spider):
             item['curr_ah_away_odds']=curr_ah_away_odds
             item['odds_status']=odds_status
             item['DOWNLOAD_DATE']=download_date_time
+
             yield item
