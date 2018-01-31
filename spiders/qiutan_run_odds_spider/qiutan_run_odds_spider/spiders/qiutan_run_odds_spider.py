@@ -29,8 +29,8 @@ class QTRunOddsSpider(Spider):
     # If set to False, will scratch thw whole year's games.
     day_query_flag = True
     # day_query_flag = False
-    start_date_string = "2018-01-14"
-    end_date_string = "2018-01-14"
+    start_date_string = "2018-01-20"
+    end_date_string = "2018-01-20"
     # start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d")
     # end_date_obj = datetime.datetime.strptime(end_date_string, "%Y-%m-%d")
     start_date_obj = datetime.datetime.strptime(start_date_string, "%Y-%m-%d").astimezone(timezone(timedelta(hours=-8)))
@@ -222,6 +222,7 @@ class QTRunOddsSpider(Spider):
 
             try:
                 company_name = td_list[0].xpath("text()").extract()[0]
+                print("company name in list page {}".format(company_name))
             except:
                 company_name = ""
 
@@ -236,13 +237,12 @@ class QTRunOddsSpider(Spider):
                 yield SplashRequest(detail_url, self.parse_run_odds_page, args={
                         'wait': 0.5, 'html': 1, 'timeout': 3600,
                     }, headers=HEADERS,
-                    meta={'meta_item': meta_item}
+                    meta={'meta_item': meta_item, 'com_name': company_name}
                 )
 
     def parse_run_odds_page(self, response):
         print("+++++++++++++++++++++++++++++++")
         meta_item = response.meta['meta_item']
-
         tr_list = response.xpath("//*[@id='content']/table/tbody/tr/td[1]/table/tbody/tr")
         # First row would be column names
         tr_list = tr_list[2:]
@@ -280,7 +280,9 @@ class QTRunOddsSpider(Spider):
 
             item['qiutan_game_id']= meta_item['qiutan_game_id']
             item['GAME_DATE']=meta_item['GAME_DATE']
-            item['offer_company_name']=meta_item['offer_company_name']
+            # item['offer_company_name']=meta_item['offer_company_name']
+            item['offer_company_name'] = response.meta['com_name']
+            print("company name in list page {}".format(response.meta['com_name']))
             item['game_run_time']=game_run_time
             item['home_team_name']=meta_item['home_team_name']
             item['away_team_name']=meta_item['away_team_name']
